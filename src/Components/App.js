@@ -21,6 +21,7 @@ export default function App() {
     const onCloseButton = () => {
         setimdbIb(null);
     }
+
     const handleAddWatched = (movie) => {
         setWatched((watched) => [...watched, movie])
         setimdbIb(null);
@@ -30,12 +31,17 @@ export default function App() {
         setWatched(watched => watched.filter(watch => watch.imdbID !== id))
     }
 
+
     useEffect(() => {
+        const controller = new AbortController();
         async function fetchListOfMovies() {
+
             try {
                 setLoading(true);
                 const response = await fetch(
-                    `http://www.omdbapi.com/?apikey=${api_key}&s=${query}`
+                    `http://www.omdbapi.com/?apikey=${api_key}&s=${query}`,
+                    { signal: controller.signal }
+
                 );
 
                 if (!response.ok) {
@@ -48,9 +54,11 @@ export default function App() {
                 } else {
                     setMovies(data.Search);
                 }
-            } catch (error) {
-                console.error(error.message);
-                setError(error.message);
+            } catch (err) {
+                if (err.name !== "AbortError") {
+                    console.log(err.message);
+                    setError(err.message);
+                }
             } finally {
                 setLoading(false);
             }
@@ -60,8 +68,12 @@ export default function App() {
             setError("")
             return;
         }
-
+        onCloseButton()
         fetchListOfMovies();
+
+        return function () {
+            controller.abort();
+        };
     }, [query]);
 
     return (
@@ -104,7 +116,7 @@ function Nav({ children }) {
         <nav className="nav-bar">
             <div className="logo">
                 <span role="img">🍿</span>
-                <h1>MovieBuddy </h1>
+                <h1> MovieBuddy </h1>
             </div>
             {children}
         </nav>
@@ -179,6 +191,23 @@ function Movie({ movieId, onCloseMovie, onhandleAddWatched, watched }) {
         onCloseMovie();
     }
 
+    useEffect(
+        function () {
+            function callback(e) {
+                if (e.code === "Escape") {
+                    onCloseMovie();
+                    console.log("sorry")
+                }
+            }
+
+            document.addEventListener("keydown", callback);
+
+            return function () {
+                document.removeEventListener("keydown", callback);
+            };
+        },
+        [onCloseMovie]
+    );
     useEffect(() => {
         async function fetchMovieDetails() {
             setLoading(true);
@@ -197,6 +226,14 @@ function Movie({ movieId, onCloseMovie, onhandleAddWatched, watched }) {
 
         fetchMovieDetails();
     }, [movieId]);
+    useEffect(() => {
+
+        if (!title) return
+        document.title = `Movie | ${title}`
+        return function () {
+            document.title = "MovieBuddy"
+        }
+    }, [title])
 
     return (
         <div className="details">
@@ -263,7 +300,7 @@ function MovieList({ movies, onHoverImbdId }) {
 function DisplayListOfMovies({ movie, onHoverImbdId }) {
     return (
         <li key={movie.imdbID} onClick={() => onHoverImbdId(movie.imdbID)}>
-            <img src={movie.Poster} alt={`${movie.Title} poster`} />
+            <img src={movie.Poster} alt={`${movie.title} poster`} />
             <h3>{movie.Title}</h3>
             <div>
                 <p>
@@ -318,7 +355,7 @@ function DisplayListOFWatchedMovies({ movie, onClickDelete }) {
     return (
         <li key={movie.imdbID}>
             <img src={movie.poster} alt={`${movie.Title} poster`} />
-            <h3>{movie.Title}</h3>
+            <h3>{movie.title}</h3>
             <div>
                 <p>
                     <span>⭐️</span>
